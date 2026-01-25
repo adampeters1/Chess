@@ -15,7 +15,7 @@ from gui.interface import ChessInterface
 def show_main_menu():
     """Display the main menu and return selected game mode and difficulty."""
     pygame.init()
-    screen = pygame.display.set_mode((400, 500))
+    screen = pygame.display.set_mode((400, 600))
     pygame.display.set_caption("Chess Game - Main Menu")
     
     # Colors
@@ -110,16 +110,21 @@ def show_main_menu():
             diff_rect = diff_text.get_rect(center=(200, 290))
             screen.blit(diff_text, diff_rect)
             
-            # Draw difficulty buttons
+            # Draw difficulty buttons with color coding: green (easy), blue (medium), red (hard)
+            difficulty_colors = {
+                Difficulty.BEGINNER: (0, 200, 0),       # Green
+                Difficulty.INTERMEDIATE: (0, 100, 200), # Blue
+                Difficulty.ADVANCED: (200, 0, 0)        # Red
+            }
             for diff, button_key in [(Difficulty.BEGINNER, 'beginner'), 
                                      (Difficulty.INTERMEDIATE, 'intermediate'), 
                                      (Difficulty.ADVANCED, 'advanced')]:
                 button = buttons[button_key]
-                color = BLUE if selected_difficulty == diff else LIGHT_GRAY
+                color = difficulty_colors[diff]
                 pygame.draw.rect(screen, color, button)
                 pygame.draw.rect(screen, BLACK, button, 2)
                 
-                text = small_font.render(diff.name.capitalize(), True, WHITE if selected_difficulty == diff else BLACK)
+                text = small_font.render(diff.name.capitalize(), True, WHITE)
                 text_rect = text.get_rect(center=button.center)
                 screen.blit(text, text_rect)
         
@@ -137,9 +142,9 @@ def show_main_menu():
             "Press U to undo, R to reset",
             "Press F to flip board, L to toggle legal moves"
         ]
-        y = 480
+        y = 530
         for instruction in instructions:
-            inst_text = small_font.render(instruction, True, GRAY)
+            inst_text = small_font.render(instruction, True, BLACK)
             inst_rect = inst_text.get_rect(center=(200, y))
             screen.blit(inst_text, inst_rect)
             y += 25
