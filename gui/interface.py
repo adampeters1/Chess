@@ -52,6 +52,9 @@ class ChessInterface:
         self.ai_thinking = False
         self.ai_move_result = None
         self.ai_thinking_start_time = None
+        
+        # Resign button
+        self.resign_button_rect = pygame.Rect(780, 650, 100, 35)
     
     def run(self):
         """Main game loop."""
@@ -62,7 +65,11 @@ class ChessInterface:
                     self.running = False
                 elif event.type == MOUSEBUTTONDOWN:
                     if event.button == 1:  # Left click
-                        self.handle_mouse_click(event.pos)
+                        # Check resign button first
+                        if self.resign_button_rect.collidepoint(event.pos):
+                            self._handle_resign()
+                        else:
+                            self.handle_mouse_click(event.pos)
                     elif event.button == 3:  # Right click
                         self.selected_square = None
                         self.legal_moves = []
@@ -204,6 +211,9 @@ class ChessInterface:
         # Draw controls help
         self._draw_controls()
         
+        # Draw resign button
+        self._draw_resign_button()
+        
         # Update display
         pygame.display.flip()
     
@@ -231,6 +241,42 @@ class ChessInterface:
             text = font.render(control, True, (60, 60, 60))
             self.screen.blit(text, (x, y))
             y += 20
+    
+    def _draw_resign_button(self):
+        """Draw the resign button at the bottom right."""
+        # Only show resign button if game is active
+        if self.game.is_game_over():
+            return
+        
+        # Draw button background
+        pygame.draw.rect(self.screen, (180, 60, 60), self.resign_button_rect)
+        pygame.draw.rect(self.screen, (120, 40, 40), self.resign_button_rect, 2)
+        
+        # Draw button text
+        font = pygame.font.SysFont('Arial', 18)
+        text = font.render("Resign", True, (255, 255, 255))
+        text_rect = text.get_rect(center=self.resign_button_rect.center)
+        self.screen.blit(text, text_rect)
+    
+    def _handle_resign(self):
+        """Handle player resignation."""
+        # Only allow resign if game is active and it's player's turn
+        if self.game.is_game_over():
+            return
+        
+        # Don't allow resign while AI is thinking
+        if self.ai_thinking:
+            return
+        
+        # Set game status to resigned
+        self.game.status = GameStatus.RESIGNED
+        self.selected_square = None
+        self.legal_moves = []
+        
+        # Show game over dialog
+        if self.show_game_over_dialog():
+            self.game.reset()
+            self.last_move = None
     
     def show_promotion_dialog(self, position):
         """Display pawn promotion choices."""
@@ -306,6 +352,10 @@ class ChessInterface:
         if self.game.status == GameStatus.CHECKMATE:
             winner = self.game.get_winner()
             message = f"{winner.name} wins by checkmate!"
+        elif self.game.status == GameStatus.RESIGNED:
+            # The player who resigned loses, so opponent wins
+            winner = Color.BLACK if self.game.current_player == Color.WHITE else Color.WHITE
+            message = f"{winner.name} wins by resignation!"
         elif self.game.status == GameStatus.STALEMATE:
             message = "Game drawn by stalemate!"
         elif self.game.status == GameStatus.DRAW_FIFTY_MOVE:

@@ -220,27 +220,116 @@ class ChessAI:
                 move_info['captured'].position = to_pos
     
     def _order_moves(self, game, moves):
-        """Order moves to improve alpha-beta pruning efficiency."""
+        """Order moves to improve alpha-beta pruning efficiency.
+        
+        Prioritizes moves in this order:
+        1. Captures (using MVV-LVA: Most Valuable Victim - Least Valuable Attacker)
+        2. Checks (moves that put opponent in check)
+        3. Promotions
+        4. Center control moves
+        5. Other moves
+        """
         scored_moves = []
+        enemy_color = Color.BLACK if game.current_player == Color.WHITE else Color.WHITE
+        enemy_king = game.board.find_king(enemy_color)
+        enemy_king_pos = enemy_king.position if enemy_king else None
         
         for from_pos, to_pos in moves:
             score = 0
-            # Prioritize captures
+            piece = game.board.get_piece(from_pos)
             captured = game.board.get_piece(to_pos)
+            
+            # Prioritize captures (MVV-LVA)
             if captured:
-                # MVV-LVA: Most Valuable Victim - Least Valuable Attacker
-                attacker = game.board.get_piece(from_pos)
                 victim_value = self._get_piece_value(captured.piece_type)
-                attacker_value = self._get_piece_value(attacker.piece_type)
-                score += 10 * victim_value - attacker_value
-            # Prioritize center moves
+                attacker_value = self._get_piece_value(piece.piece_type)
+                score += 1000 + (10 * victim_value - attacker_value)
+            
+            # Prioritize checks
+            if enemy_king_pos and self._move_gives_check(game, from_pos, to_pos, enemy_king_pos):
+                score += 500
+            
+            # Prioritize pawn promotions
+            if piece.piece_type == PieceType.PAWN:
+                promotion_row = 0 if piece.color == Color.WHITE else 7
+                if to_pos[0] == promotion_row:
+                    score += 900
+            
+            # Prioritize center control
             if to_pos in [(3, 3), (3, 4), (4, 3), (4, 4)]:
-                score += 5
+                score += 30
+            elif to_pos in [(2, 2), (2, 3), (2, 4), (2, 5),
+                           (3, 2), (3, 5), (4, 2), (4, 5),
+                           (5, 2), (5, 3), (5, 4), (5, 5)]:
+                score += 15
+            
+            # Slight bonus for developing pieces (moving from back rank)
+            if piece.piece_type in [PieceType.KNIGHT, PieceType.BISHOP]:
+                back_rank = 7 if piece.color == Color.WHITE else 0
+                if from_pos[0] == back_rank:
+                    score += 10
                 
             scored_moves.append((score, from_pos, to_pos))
         
         scored_moves.sort(key=lambda x: x[0], reverse=True)
         return [(move[1], move[2]) for move in scored_moves]
+    
+    def _move_gives_check(self, game, from_pos, to_pos, enemy_king_pos):
+        """Check if a move would give check to the enemy king."""
+        piece = game.board.get_piece(from_pos)
+        if not piece:
+            return False
+        
+        # Simulate the piece being at to_pos and check if it attacks the king
+        # This is a simplified check - we look at direct attacks only
+        piece_type = piece.piece_type
+        row_diff = enemy_king_pos[0] - to_pos[0]
+        col_diff = enemy_king_pos[1] - to_pos[1]
+        
+        # Knight check
+        if piece_type == PieceType.KNIGHT:
+            if (abs(row_diff), abs(col_diff)) in [(1, 2), (2, 1)]:
+                return True
+        
+        # Pawn check
+        elif piece_type == PieceType.PAWN:
+            direction = -1 if piece.color == Color.WHITE else 1
+            if row_diff == direction and abs(col_diff) == 1:
+                return True
+        
+        # Rook/Queen check (straight lines)
+        elif piece_type in [PieceType.ROOK, PieceType.QUEEN]:
+            if row_diff == 0 or col_diff == 0:
+                if self._is_path_clear(game, to_pos, enemy_king_pos, from_pos):
+                    return True
+        
+        # Bishop/Queen check (diagonals)
+        if piece_type in [PieceType.BISHOP, PieceType.QUEEN]:
+            if abs(row_diff) == abs(col_diff) and row_diff != 0:
+                if self._is_path_clear(game, to_pos, enemy_king_pos, from_pos):
+                    return True
+        
+        return False
+    
+    def _is_path_clear(self, game, from_pos, to_pos, ignore_pos):
+        """Check if path between two positions is clear (ignoring a specific position)."""
+        row_diff = to_pos[0] - from_pos[0]
+        col_diff = to_pos[1] - from_pos[1]
+        
+        row_step = 0 if row_diff == 0 else (1 if row_diff > 0 else -1)
+        col_step = 0 if col_diff == 0 else (1 if col_diff > 0 else -1)
+        
+        current_row = from_pos[0] + row_step
+        current_col = from_pos[1] + col_step
+        
+        while (current_row, current_col) != to_pos:
+            if (current_row, current_col) != ignore_pos:
+                if game.board.get_piece((current_row, current_col)) is not None:
+                    return False
+            current_row += row_step
+            current_col += col_step
+        
+        return True
     
     def _get_piece_value(self, piece_type):
         """Get simple piece value for move ordering."""
