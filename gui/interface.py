@@ -1,5 +1,6 @@
 import pygame
 import threading
+import time
 from pygame.locals import *
 from core.init import Game, GameMode, Difficulty, Color, GameStatus, PieceType
 from gui.renderer import BoardRenderer, GameStatusRenderer
@@ -50,6 +51,7 @@ class ChessInterface:
         # AI threading state
         self.ai_thinking = False
         self.ai_move_result = None
+        self.ai_thinking_start_time = None
     
     def run(self):
         """Main game loop."""
@@ -195,11 +197,24 @@ class ChessInterface:
         self.status_renderer.draw_turn_indicator(self.game.current_player)
         self.status_renderer.draw_game_status(self.game.status, self.game.get_winner())
         
+        # Draw AI thinking timer if applicable
+        if self.ai_thinking and self.ai_thinking_start_time is not None:
+            self._draw_thinking_timer()
+        
         # Draw controls help
         self._draw_controls()
         
         # Update display
         pygame.display.flip()
+    
+    def _draw_thinking_timer(self):
+        """Draw AI thinking timer below turn indicator."""
+        elapsed_time = time.time() - self.ai_thinking_start_time
+        font = pygame.font.SysFont('Arial', 16)
+        timer_text = f"Opponent thinking for {elapsed_time:.1f} seconds"
+        text_surface = font.render(timer_text, True, (100, 100, 100))
+        x, y = 680, 115
+        self.screen.blit(text_surface, (x, y))
     
     def _draw_controls(self):
         """Draw keyboard controls help."""
@@ -359,6 +374,7 @@ class ChessInterface:
         
         # Start AI computation in background thread
         self.ai_thinking = True
+        self.ai_thinking_start_time = time.time()
         ai_thread = threading.Thread(target=self._compute_ai_move, daemon=True)
         ai_thread.start()
     
@@ -372,6 +388,7 @@ class ChessInterface:
         best_move = self.ai_move_result
         self.ai_move_result = None
         self.ai_thinking = False
+        self.ai_thinking_start_time = None
         
         if best_move:
             from_pos, to_pos = best_move
