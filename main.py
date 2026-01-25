@@ -124,7 +124,7 @@ def show_main_menu():
                 pygame.draw.rect(screen, color, button)
                 pygame.draw.rect(screen, BLACK, button, 2)
                 
-                text = small_font.render(diff.name.capitalize(), True, WHITE)
+                text = small_font.render(diff.name.capitalize(), True, WHITE if selected_difficulty == diff else BLACK)
                 text_rect = text.get_rect(center=button.center)
                 screen.blit(text, text_rect)
         

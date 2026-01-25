@@ -1,4 +1,5 @@
 import pygame
+import threading
 from pygame.locals import *
 from core.init import Game, GameMode, Difficulty, Color, GameStatus, PieceType
 from gui.renderer import BoardRenderer, GameStatusRenderer
@@ -45,6 +46,10 @@ class ChessInterface:
         
         # Colors
         self.bg_color = (210, 210, 210)
+        
+        # AI threading state
+        self.ai_thinking = False
+        self.ai_move_result = None
     
     def run(self):
         """Main game loop."""
@@ -75,6 +80,10 @@ class ChessInterface:
                 self.game.current_player == Color.BLACK and 
                 not self.game.is_game_over()):
                 self._handle_ai_move()
+            
+            # Check if AI has finished computing its move
+            if self.ai_move_result is not None:
+                self._apply_ai_move()
         
         pygame.quit()
     
@@ -339,13 +348,31 @@ class ChessInterface:
         return False
     
     def _handle_ai_move(self):
-        """Handle AI player move."""
+        """Handle AI player move using a background thread."""
+        # Don't start a new thread if AI is already thinking
+        if self.ai_thinking:
+            return
+        
         # Initialize AI if not already done
         if not hasattr(self, 'ai_player'):
             self.ai_player = ChessAI(Color.BLACK, self.game.difficulty)
         
-        # Get AI move
+        # Start AI computation in background thread
+        self.ai_thinking = True
+        ai_thread = threading.Thread(target=self._compute_ai_move, daemon=True)
+        ai_thread.start()
+    
+    def _compute_ai_move(self):
+        """Compute AI move in background thread."""
         best_move = self.ai_player.get_best_move(self.game)
+        self.ai_move_result = best_move
+    
+    def _apply_ai_move(self):
+        """Apply the computed AI move to the game."""
+        best_move = self.ai_move_result
+        self.ai_move_result = None
+        self.ai_thinking = False
+        
         if best_move:
             from_pos, to_pos = best_move
             self.game.make_move(from_pos, to_pos)
