@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 from ai.evaluation import PositionEvaluator
 from ai.difficulty import DifficultyConfig
 from core.init import Color, PieceType
@@ -23,20 +24,23 @@ class ChessAI:
         if self.config.randomness > 0 and random.random() < self.config.randomness:
             return random.choice(legal_moves)
         
+        # Create a single deep copy to work with, preserving the original game state
+        search_game = deepcopy(game)
+        
         best_move = None
         best_value = float('-inf')
         alpha = float('-inf')
         beta = float('inf')
         
         # Order moves for better pruning (captures first)
-        ordered_moves = self._order_moves(game, legal_moves)
+        ordered_moves = self._order_moves(search_game, legal_moves)
         
         for from_pos, to_pos in ordered_moves:
-            move_info = self._make_move(game, from_pos, to_pos)
+            move_info = self._make_move(search_game, from_pos, to_pos)
             
-            value = self._minimax(game, self.config.depth - 1, alpha, beta, False)
+            value = self._minimax(search_game, self.config.depth - 1, alpha, beta, False)
             
-            self._unmake_move(game, move_info)
+            self._unmake_move(search_game, move_info)
             
             if value > best_value:
                 best_value = value
